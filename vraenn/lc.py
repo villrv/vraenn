@@ -4,6 +4,27 @@ import scipy
 import george
 import extinction
 
+# Putting in Miles code
+'''
+import speclite.filters
+from scipy.stats import wasserstein_distance
+
+lsst = speclite.filters.load_filters(f'lsst2016-*')
+filters = 'ugrizy'
+data = {f: speclite.filters.load_filters(f'lsst2016-{f}')[0] for f in filters}
+wavelength = np.linspace(3000, 11000, num=10000)*u.AA
+normalized = {f: data[f](wavelength)/data[f](wavelength).sum() for f in filters}
+
+def distance_between_filters(filter1, filter2):
+    return wasserstein_distance(
+        u_values=wavelength.value, v_values=wavelength.value,
+        u_weights=normalized[filter1], v_weights=normalized[filter2]
+    )
+
+distance_matrix = np.array([[distance_between_filters(col, row) for col in filters] for row in filters])
+distance_matrix /= np.average(distance_matrix) #Doing this so still be ~1
+filter_distances = np.diag(distance_matrix) #This is an inefficient hack
+'''
 
 class LightCurve(object):
     """Light Curve class
@@ -130,7 +151,8 @@ class LightCurve(object):
         gp_mags = self.abs_mags - self.abs_lim_mag
         dense_fluxes = np.zeros((len(self.times), nfilts))
         dense_errs = np.zeros((len(self.times), nfilts))
-        stacked_data = np.vstack([self.times, self.filters]).T
+        stacked_data = np.vstack([self.times, filter_distances[self.filters]]).T
+        print(stacked_data)
         x_pred = np.zeros((len(self.times)*nfilts, 2))
         kernel = np.var(gp_mags) * george.kernels.ExpSquaredKernel([25, 1], ndim=2)
         gp = george.GP(kernel)

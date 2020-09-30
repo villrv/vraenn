@@ -21,11 +21,11 @@ date = str(now.strftime("%Y-%m-%d"))
 #tf.config.experimental_run_functions_eagerly(True)
 
 
-
 NEURON_N_DEFAULT = 100
 ENCODING_N_DEFAULT = 10
 N_EPOCH_DEFAULT = 1000
 nfilts = 2
+
 
 
 def customLoss(yTrue, yPred):
