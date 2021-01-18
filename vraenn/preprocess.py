@@ -98,6 +98,8 @@ def read_in_meta_table(metatable):
         Array of object IDs (strings)
     redshift : numpy.ndarray
         Array of redshifts
+    redshift_err : numpy.ndarray
+        Array of redshift errors
     obj_type : numpy.ndarray
         Array of SN spectroscopic types
     my_peak : numpy.ndarray
@@ -109,13 +111,13 @@ def read_in_meta_table(metatable):
     ----------
     Make metatable more flexible
     """
-    obj, redshift, obj_type, \
+    obj, redshift, redshift_err, obj_type, \
         my_peak, ebv = np.loadtxt(metatable, unpack=True, dtype=str, delimiter=' ')
     redshift = np.asarray(redshift, dtype=float)
     my_peak = np.asarray(my_peak, dtype=float)
     ebv = np.asarray(ebv, dtype=float)
 
-    return obj, redshift, obj_type, my_peak, ebv
+    return obj, redshift, redshift_err, obj_type, my_peak, ebv
 
 
 def save_lcs(lc_list, output_dir):
@@ -169,7 +171,7 @@ def main():
     parser.add_argument('--shifttype', type=str, default = 'peak', help='how to shift time. Input time or peak')
     args = parser.parse_args()
 
-    objs, redshifts, obj_types, peaks, ebvs = read_in_meta_table(args.metatable)
+    objs, redshifts, redshift_errs, obj_types, peaks, ebvs = read_in_meta_table(args.metatable)
 
     # Grab all the LC files in the input directory
     file_names = []
@@ -205,7 +207,7 @@ def main():
     my_lcs = []
     for i, my_lc in enumerate(lc_list):
         my_lc.add_LC_info(zpt=args.zpt, mwebv=ebvs[i],
-                          redshift=redshifts[i], lim_mag=args.lm,
+                          redshift=redshifts[i], redshift_err = redshift_errs[i], lim_mag=args.lm,
                           obj_type=obj_types[i])
         my_lc.get_abs_mags()
 
@@ -216,6 +218,7 @@ def main():
         if my_lc.times.size < 1:
             continue
 
+
         if args.shifttype == 'peak':
             pmjd = my_lc.find_peak(peaks[i])
         else:
@@ -225,6 +228,8 @@ def main():
         my_lc.filter_names_to_numbers(filt_dict)
         my_lc.correct_extinction(wvs)
         my_lc.cut_lc()
+        if my_lc.times.size < 3:
+            continue
         my_lc.make_dense_LC(nfilt)
 
         my_lcs.append(my_lc)

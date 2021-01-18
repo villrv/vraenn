@@ -5,14 +5,23 @@ import george
 import extinction
 
 # Putting in Miles code
-'''
-import speclite.filters
 from scipy.stats import wasserstein_distance
+from sklearn.gaussian_process import GaussianProcessRegressor
+from sklearn.gaussian_process.kernels import RBF, ConstantKernel, PairwiseKernel
+from scipy.optimize import minimize
+import speclite.filters
+from astropy import units as u
+
 
 lsst = speclite.filters.load_filters(f'lsst2016-*')
+
 filters = 'ugrizy'
+
+max_band = len(filters)
+
 data = {f: speclite.filters.load_filters(f'lsst2016-{f}')[0] for f in filters}
 wavelength = np.linspace(3000, 11000, num=10000)*u.AA
+
 normalized = {f: data[f](wavelength)/data[f](wavelength).sum() for f in filters}
 
 def distance_between_filters(filter1, filter2):
@@ -22,15 +31,84 @@ def distance_between_filters(filter1, filter2):
     )
 
 distance_matrix = np.array([[distance_between_filters(col, row) for col in filters] for row in filters])
-distance_matrix /= np.average(distance_matrix) #Doing this so still be ~1
-filter_distances = np.diag(distance_matrix) #This is an inefficient hack
-'''
+distance_matrix /= np.average(distance_matrix)
+
+def run_gp(Xt, Xf, Xfl, Xfle):
+
+    mag_var = np.var(Xfl)
+
+    def metric(x1, x2, p):
+        band1 = (x1[1].astype(int))
+        band2 = (x2[1].astype(int))
+        time_distance = x2[0] - x1[0]
+        photometric_distance = distance_matrix[band1, band2]
+
+        return (
+            mag_var*np.exp(-photometric_distance**2/(2*p[0]**2) - time_distance**2/(2*p[1]**2))
+            )
+        
+    def fit_gp(X, y, p):
+        cur_metric = lambda x1, x2, gamma: metric(x1, x2, p)
+
+        kernel = PairwiseKernel(metric=cur_metric)
+        gp = GaussianProcessRegressor(kernel=kernel,
+                                    alpha=y[:, 1]**2,
+                                    normalize_y=False)
+        gp.fit(X, y[:, 0])
+        return gp
+
+    cX = np.stack(
+        (Xt, Xf), axis=1).astype(np.float32)
+    cy = np.stack(
+        (Xfl, Xfle), axis=1).astype(np.float32)
+
+    def try_lt_lp(p):
+        summed_log_like = 0.0
+        gp = fit_gp(cX, cy, p)
+        summed_log_like += gp.log_marginal_likelihood()
+
+        return -summed_log_like
+    
+    
+    res = minimize(
+        lambda x: try_lt_lp(np.exp(x)),
+        [2.3, 0.0], bounds=[(-3, 4.5),(-6,4)])
+    '''
+    res = minimize(
+    lambda x: try_lt_lp(np.exp(x)),
+    [0.0, 0.0], bounds=[(-6, 10)]*2)
+    for _ in range(10):
+        otherres = minimize(
+            lambda x: try_lt_lp(np.exp(x)),
+            np.random.rand(2)*6-3,
+            bounds=[(-6, 10)]*2)
+        if otherres.fun < res.fun:
+            res = otherres
+    '''
+    best_lengths = np.exp(
+        res.x
+    )
+
+    gp = fit_gp(cX, cy, best_lengths)
+    all_mus = []
+    all_stds = []
+    for band in range(max_band):
+        test_data = np.array([[it, band] for it in Xt])
+        mu, std = gp.predict(test_data, return_std=True)
+        all_mus.append(mu)
+        all_stds.append(std**2) #this is var, hacky
+    
+    all_stds = np.array(all_stds)
+    all_mus = np.array(all_mus)
+    return all_mus, all_stds, gp
+#END OF MILES CODE
 
 class LightCurve(object):
     """Light Curve class
     """
     def __init__(self, name, times, fluxes, flux_errs, filters,
-                 zpt=0, mwebv=0, redshift=None, lim_mag=None,
+                 zpt=0, mwebv=0, redshift=None, redshift_err=None,
+                 lim_mag=None,
                  obj_type=None):
 
         self.name = name
@@ -41,6 +119,7 @@ class LightCurve(object):
         self.zpt = zpt
         self.mwebv = mwebv
         self.redshift = redshift
+        self.redshift_err = redshift_err
         self.lim_mag = lim_mag
         self.obj_type = obj_type
 
@@ -93,11 +172,12 @@ class LightCurve(object):
             gind = np.where(self.filters == str(i))
             self.abs_mags[gind] = self.abs_mags[gind] - alam
 
-    def add_LC_info(self, zpt=27.5, mwebv=0.0, redshift=0.0,
+    def add_LC_info(self, zpt=27.5, mwebv=0.0, redshift=0.0,redshift_err=0.0,
                     lim_mag=25.0, obj_type='-'):
         self.zpt = zpt
         self.mwebv = mwebv
         self.redshift = redshift
+        self.redshift_err = redshift_err
         self.lim_mag = lim_mag
         self.obj_type = obj_type
 
@@ -151,9 +231,12 @@ class LightCurve(object):
         gp_mags = self.abs_mags - self.abs_lim_mag
         dense_fluxes = np.zeros((len(self.times), nfilts))
         dense_errs = np.zeros((len(self.times), nfilts))
-        stacked_data = np.vstack([self.times, filter_distances[self.filters]]).T
-        print(stacked_data)
+        stacked_data = np.vstack([self.times, self.filters]).T
         x_pred = np.zeros((len(self.times)*nfilts, 2))
+        print(self.name)
+
+        #old GP
+        '''
         kernel = np.var(gp_mags) * george.kernels.ExpSquaredKernel([25, 1], ndim=2)
         gp = george.GP(kernel)
         gp.compute(stacked_data, self.abs_mags_err)
@@ -179,14 +262,38 @@ class LightCurve(object):
             x_pred[jj*nfilts:jj*nfilts+nfilts, 0] = [time]*nfilts
             x_pred[jj*nfilts:jj*nfilts+nfilts, 1] = np.arange(nfilts)
         pred, pred_var = gp.predict(gp_mags, x_pred, return_var=True)
+        gp.recompute()
+        #self.gp = gp
 
         for jj in np.arange(nfilts):
             gind = np.where(x_pred[:, 1] == jj)[0]
             dense_fluxes[:, int(jj)] = pred[gind] + self.abs_lim_mag
             dense_errs[:, int(jj)] = np.sqrt(pred_var[gind])
+        import matplotlib.pyplot as plt
+
+        colors = ['darkblue','green','red','orange','purple','black']
+        for i in np.arange(6):
+            plt.plot(self.times,dense_fluxes[:,i],alpha=0.5,
+                        linewidth=3.0, color=colors[i])
+        '''
+        pred, pred_var, gp = run_gp(self.times, self.filters, gp_mags, self.abs_mags_err)
+        pred = pred.T
+        pred_var = pred_var.T
+        self.gp = [1,2,3]
+
+        dense_fluxes = pred + self.abs_lim_mag
+        dense_errs = np.sqrt(pred_var)
+
         self.dense_lc = np.dstack((dense_fluxes, dense_errs))
-        gp.recompute()
-        self.gp = gp
+        '''
+        for i in np.arange(6):
+            plt.plot(self.times,dense_fluxes[:,i],color=colors[i],linestyle='--')
+
+        for i in np.arange(len(self.times)):
+            plt.plot(self.times[i],self.abs_mags[i],'o',color=colors[int(self.filters[i])])
+        plt.show()
+        '''
+
         self.gp_mags = gp_mags
         return gp, gp_mags
         # Need except statementgp.set_parameter_vector([1, 100, 1])

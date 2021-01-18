@@ -181,7 +181,14 @@ def prep_data_for_training(featurefile, metatable, whiten=True):
     features = feat_data['features']
     feat_names = feat_data['feat_names']
     metadata = np.loadtxt(metatable, dtype=str, usecols=(0, 2))
-    sn_dict = {'SLSN': 0, 'SNII': 1, 'SNIIn': 2, 'SNIa': 3, 'SNIbc': 4}
+
+    sn_dict = {'SLSN': 0, 'SLSN-I': 0, 'SNIIL': 0,
+                'SNII': 1, 'SNIIP': 1, 'SNIIb': 1, 'SNII-pec':1,
+                'SNIIn': 2, 'SLSN-II': 2,
+                'SNIa': 3, 'SNIa-91bg-like': 3, 'SNIa-91T-like': 3,
+                'SNIax[02cx-like]': 3, 'SNIa-pec': 3,'SNIa-CSM': 3,
+                'SNIbc': 4, 'SNIc': 4, 'SNIb': 4, 'SNIbn': 4, 'SNIc-BL': 4,
+                'SNIb/c': 4, 'SNIb-Ca-rich': 4}
 
     X = []
     y = []
@@ -227,7 +234,7 @@ def main():
                         help='Add random number as feature (for testing)')
     parser.add_argument('--calc-importance', dest='calc_importance', type=bool,
                         default=False, help='Calculate feature importance')
-    parser.add_argument('--only-raenn', dest='only_raenn', type=bool, default=False, help='Use ony RAENN features')
+    parser.add_argument('--only-raenn', dest='only_raenn', type=bool, default=True, help='Use ony RAENN features')
     parser.add_argument('--not-raenn', dest='not_raenn', type=bool, default=False, help='Exclude RAENN features')
     parser.add_argument('--no-int', dest='no_int', type=bool, default=False,
                         help='Exclude integral features (for testing)')
@@ -240,7 +247,8 @@ def main():
                         default='superprob', help='Name of probability table file')
     args = parser.parse_args()
 
-    sn_dict = {'SLSN': 0, 'SNII': 1, 'SNIIn': 2, 'SNIa': 3, 'SNIbc': 4}
+    sn_dict = {'SLSN': 0, 'SNII': 1, 'SNIIn': 2, 'SNIa': 3, 'SNIbc': 4,
+                'SNIc': 4, 'SNIb': 4}
 
     if args.train:
         X, y, names, means, stds, feature_names = prep_data_for_training(args.featurefile, args.metatable)
@@ -271,10 +279,16 @@ def main():
                 X_train, X_test = X[train_index], X[test_index]
                 y_train, y_test = y[train_index], y[test_index]
 
+                print(X_test,y_test)
+
+                if y_test !=4:
+                    continue
+
+
                 if args.resampling == 'Gauss':
-                    X_res, y_res = Gauss_resample(X_train, y_train, 500)
+                    X_res, y_res = Gauss_resample(X_train, y_train, 2000)
                 else:
-                    X_res, y_res = KDE_resample(X_train, y_train, 500)
+                    X_res, y_res = KDE_resample(X_train, y_train, 2000)
 
                 new_ind = np.arange(len(y_res), dtype=int)
                 np.random.shuffle(new_ind)
@@ -282,12 +296,12 @@ def main():
                 y_res = y_res[new_ind]
 
                 if args.calc_importance:
-                    X_res2, y_res2 = Gauss_resample(X_train, y_train, 500)
+                    X_res2, y_res2 = Gauss_resample(X_train, y_train, 2000)
                     X_res2 = X_res2[:-40, :]
                     y_res2 = y_res2[:-40]
 
                 if args.add_random:
-                    X_res2, y_res2 = Gauss_resample(X_train, y_train, 500)
+                    X_res2, y_res2 = Gauss_resample(X_train, y_train, 2000)
                     X_res2 = X_res2[:-40, :]
                     y_res2 = y_res2[:-40]
                     X_res = np.vstack((X_res.T, np.random.randn(len(X_res)))).T

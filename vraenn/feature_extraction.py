@@ -55,11 +55,22 @@ def feat_from_raenn(data_file, model_base=None,
         model = model_from_json(f.read())
     model.load_weights(model_weight_file)
 
-    encodingN = model.layers[2].output_shape[1]
-    original_input = Input(shape=(None, nfilts*2+1))
-    encoded = model.layers[2]
+    encodingN = model.layers[4].output_shape[1]
+    input_1 = Input((None, nfilts*2+1))
+    encoded_input = Input(shape=(None,(encodingN+2)))
+    decoder_layer2 = model.layers[-3]
+    decoder_layer3 = model.layers[-2]
+    decoder_layer4 = model.layers[-1]
+
+    merged = model.layers[-4]
+    repeater = model.layers[-5]
+    encoded2 = model.layers[2]
     encoded1 = model.layers[1]
-    encoder = Model(input=original_input, output=encoded(encoded1(original_input)))
+    encoded = model.layers[3]
+    encoded_sig = model.layers[4]
+    decoder = Model(encoded_input,decoder_layer4(decoder_layer3(decoder_layer2(encoded_input))))
+    encoder = Model(input_1, encoded(encoded2(encoded1(input_1))))
+    encoder_sig = Model(input_1, encoded_sig(encoded2(encoded1(input_1))))
 
     if plot:
         decoder = get_decoder(model, encodingN)
@@ -189,18 +200,18 @@ def main():
     parser.add_argument('--plot', type=str2bool, default=False, help='Plot LCs, for testing')
     parser.add_argument('--model-base', type=str, dest='model_base', default='./products/models/model', help='...')
     parser.add_argument('--get-feat-raenn', type=str2bool, dest='get_feat_raenn', default=True, help='...')
-    parser.add_argument('--get-feat-peaks', type=str2bool, dest='get_feat_peaks', default=True, help='...')
+    parser.add_argument('--get-feat-peaks', type=str2bool, dest='get_feat_peaks', default=False, help='...')
     parser.add_argument('--get-feat-rise-decline-1', type=str2bool,
-                        dest='get_feat_rise_decline1', default=True,
+                        dest='get_feat_rise_decline1', default=False,
                         help='...')
     parser.add_argument('--get-feat-rise-decline-2', type=str2bool,
-                        dest='get_feat_rise_decline2', default=True,
+                        dest='get_feat_rise_decline2', default=False,
                         help='...')
     parser.add_argument('--get-feat-rise-decline-3', type=str2bool,
-                        dest='get_feat_rise_decline3', default=True,
+                        dest='get_feat_rise_decline3', default=False,
                         help='...')
-    parser.add_argument('--get-feat-slope', type=str2bool, dest='get_feat_slope', default=True, help='...')
-    parser.add_argument('--get-feat-int', type=str2bool, dest='get_feat_int', default=True, help='...')
+    parser.add_argument('--get-feat-slope', type=str2bool, dest='get_feat_slope', default=False, help='...')
+    parser.add_argument('--get-feat-int', type=str2bool, dest='get_feat_int', default=False, help='...')
     parser.add_argument('--prep-file', type=str, dest='prep_file', default='./products/prep.npz', help='...')
     parser.add_argument('--outfile', type=str, dest='outfile', default='feat', help='...')
 
