@@ -120,7 +120,7 @@ def read_in_meta_table(metatable):
     return obj, redshift, redshift_err, obj_type, my_peak, ebv
 
 
-def save_lcs(lc_list, output_dir):
+def save_lcs(lc_list, output_dir, file_suffix = ''):
     """
     Save light curves as a lightcurve object
 
@@ -129,14 +129,12 @@ def save_lcs(lc_list, output_dir):
     lc_list : list
         list of light curve files
     output_dir : Output directory of light curve file
-
-    Todo:
-    ----------
-    - Add option for LC file name
+    file_suffix : str
+        String to append to file name
     """
     now = datetime.datetime.now()
     date = str(now.strftime("%Y-%m-%d"))
-    file_name = 'lcs_' + date + '.npz'
+    file_name = 'lcs_' + date + '_'+file_suffix+'.npz'
 
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
@@ -219,7 +217,6 @@ def main():
         if my_lc.times.size < 1:
             continue
 
-
         if args.shifttype == 'peak':
             pmjd = my_lc.find_peak(peaks[i])
         else:
@@ -234,7 +231,7 @@ def main():
         my_lc.make_dense_LC(nfilt)
 
         my_lcs[i] = my_lc
-    save_lcs(my_lcs, args.outdir)
+    save_lcs(my_lcs, args.outdir, args.metatable)
 
 
 if __name__ == '__main__':
