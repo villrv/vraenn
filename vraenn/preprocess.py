@@ -204,8 +204,9 @@ def main():
         nfilt = 2
 
     # Update the LC objects with info from the metatable
-    my_lcs = []
+    my_lcs = [np.nan] * len(lc_list)
     for i, my_lc in enumerate(lc_list):
+        print(i)
         my_lc.add_LC_info(zpt=args.zpt, mwebv=ebvs[i],
                           redshift=redshifts[i], redshift_err = redshift_errs[i], lim_mag=args.lm,
                           obj_type=obj_types[i])
@@ -232,7 +233,7 @@ def main():
             continue
         my_lc.make_dense_LC(nfilt)
 
-        my_lcs.append(my_lc)
+        my_lcs[i] = my_lc
     save_lcs(my_lcs, args.outdir)
 
 
