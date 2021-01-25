@@ -94,10 +94,14 @@ def prep_input(input_lc_file, new_t_max=100.0, filler_err=1.0,
     lightcurves = np.load(input_lc_file, allow_pickle=True)['lcs']
     lengths = []
     ids = []
-    for lightcurve in lightcurves:
+    gind = []
+    for j,lightcurve in enumerate(lightcurves):
+        if type(lightcurve) == float:
+            continue
+        gind.append(j)
         lengths.append(len(lightcurve.times))
         ids.append(lightcurve.name)
-
+    lightcurves = lightcurves[gind]
     sequence_len = np.max(lengths)
     nfilts = np.shape(lightcurves[0].dense_lc)[1]
     nfiltsp1 = nfilts+1

@@ -80,6 +80,8 @@ def feat_from_raenn(data_file, model_base=None,
 
     encodings = np.zeros((len(ids), encodingN))
     for i in np.arange(len(ids)):
+        if i%10000==0:
+            print(i)
         inseq = np.reshape(sequence[i, :, :], (1, maxlen, nfilts*2+1))
         my_encoding = encoder.predict(inseq)
         encodings[i, :] = my_encoding
@@ -222,6 +224,8 @@ def main():
     ids = []
     feat_names = []
     for input_lc in input_lcs:
+        if type(input_lc) == float:
+            continue
         ids.append(input_lc.name)
     if args.get_feat_raenn:
         feat = feat_from_raenn(args.lcfile, model_base=args.model_base,
