@@ -1,2 +1,1 @@
-# To be updated...stay tuned!
-
+This is the code accompanying *A Deep Learning Approach for Active Anomaly Detection of Extragalactic Transients*. This code is meant to provide the VRAENN architecture to readers but is not meant to be production-quality.
