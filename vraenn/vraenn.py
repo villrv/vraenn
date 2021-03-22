@@ -52,7 +52,7 @@ def vae_loss(encoded_mean, encoded_log_sigma):
         #reconstruction_loss = K.mean(K.square(yTrue[:, :, 1:(1+nfilts)] - yPred[:, :, :])/K.square(yTrue[:,:,(1+nfilts):]))
         reconstruction_loss = K.log(K.mean(K.square(yTrue[:, :, 1:(1+nfilts)] - yPred[:, :, :])))
 
-        return K.mean(reconstruction_loss + kl_loss)
+        return reconstruction_loss + kl_loss
 
     return lossFunction
 
